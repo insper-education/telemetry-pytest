@@ -1,12 +1,40 @@
 #!/usr/bin/env python3
-
 import pytest
-import json
 from telemetry import telemetry
 
 
-def push(t, result):
+def push(result, config):
+    t = telemetry()
+    name = result["nodeid"].split("::")[1].replace('_', '-')
+    log = {"id": name, "status": result["outcome"]}
 
+    if log["status"] == "failed":
+        log["msg"] = result["longrepr"]["reprcrash"]["message"]
+
+    t.push(config['name'], config['prefix'] + '-' + name, config['tags'], config['points'], log)
+
+
+def parse_marks(item):
+    marks_global = []
+    marks_tags = []
+    marks_points = ""
+    for mark in item.iter_markers(name="telemetry"):
+        marks_global = mark.args
+        break
+
+    for mark in item.iter_markers(name="telemetry_tags"):
+        marks_tags = list(mark.args)
+        break
+
+    for mark in item.iter_markers(name="telemetry_points"):
+        marks_points = list(mark.args)
+        break
+
+    tags = []
+    tags.append(marks_global[2])
+    tags.extend(marks_tags)
+    tags = [x for x in tags if x != '']
+    return {'name': marks_global[0], 'prefix': marks_global[1], 'tags': tags, 'points': marks_points}
 
 
 def pytest_configure(config):
@@ -18,6 +46,10 @@ def pytest_configure(config):
         "markers", "telemetry_tags(name): telemetry tag"
     )
 
+    config.addinivalue_line(
+        "markers", "telemetry_points(name): telemetry points"
+    )
+
 
 def pytest_sessionstart(session):
     session.results = []
@@ -25,30 +57,8 @@ def pytest_sessionstart(session):
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    marks = [mark.args for mark in item.iter_markers(name="telemetry")][0]
-#    tags = [mark.args for mark in item.iter_markers(name="telemetry_tags")][0]
-    tconfig = {'name': marks[0], 'prefix': marks[1], 'tag': marks[2]}
     outcome = yield
     result = outcome.get_result()
+
     if result.when == "call":
-        item.session.results.append(result._to_json())
-        breakpoint()
-        item.session.results['tconfig'] = tconfig
-
-
-def pytest_sessionfinish(session, exitstatus):
-    t = telemetry()
-    for v in session.results:
-        breakpoint()
-        name = v["nodeid"].split("::")[1].replace('_', '-')
-        status = t.statusOk
-        log = {"id": name, "status": v["outcome"]}
-
-        if log["status"] == "failed":
-            log["msg"] = v["longrepr"]["reprcrash"]["message"]
-            status = t.statusFail
-
-#        slug = LOG_NAME_PREFIX + '-' + name
-#        tags = TAGS
-#        points = 0
-#        t.push(COURSE_NAME, slug, tags, points, log)
+        push(result._to_json(), parse_marks(item))
