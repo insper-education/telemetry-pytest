@@ -2,9 +2,9 @@
 import pytest
 from telemetry import telemetry
 
+t = telemetry()
 
 def push(result, config):
-    t = telemetry()
     name = result["nodeid"].split("::")[1].replace('_', '-')
     log = {"id": name, "status": result["outcome"]}
 
