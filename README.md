@@ -21,7 +21,7 @@ Where:
 
 - `COURSE_NAME`: A string to identify the course (i.e: `22b-bits`)
 - `PREFIX`: A prefix to identify the exercise (i.e: `lab-5`)
-- ``TAGS`: Tags to classify the test (i.e: `"comb", "easy"`)
+- `TAGS`: Tags to classify the test (i.e: `"comb", "easy"`)
 
 For each individual test you can configure `tags` and `points`:
 
