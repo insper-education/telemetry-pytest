@@ -51,16 +51,19 @@ class telemetry:
         self.statusOk = "O"
         self.statusFail = "F"
         self.statusNone = "N"
-        self.TIMEOUT = 400
+        self.TIMEOUT = 30
         signal.signal(signal.SIGALRM, self.interrupted)
 
     def checkToken(self, token):
-        response = requests.get(URL_GET_USER, headers={'Authorization': f'Token {token}'}, timeout=self.TIMEOUT)
-        if response.ok != 200:
-            student = json.loads(response.content)
-            if student and 'id' in student:
-                return True
-        return False
+        try:
+            response = requests.get(URL_GET_USER, headers={'Authorization': f'Token {token}'}, timeout=self.TIMEOUT)
+            if response.ok != 200:
+                student = json.loads(response.content)
+                if student and 'id' in student:
+                    return True
+            return None
+        except:
+            return False
 
     def interrupted(signum, frame):
         signal.signal(signal.SIGALRM, interrupted)
@@ -90,9 +93,12 @@ class telemetry:
         if config.read(CONFIG_FILE):
             if 'token' in config['active handout']:
                 token = config["active handout"]["token"]
-                if self.checkToken(token):
+                status = self.checkToken(token)
+                if status == True:
                     self.userToken = token
                     return True
+                elif status == False:
+                    return False
 
         webbrowser.open(URL_LOGIN, new=1)
         print("Wrong token, please update")
@@ -126,7 +132,6 @@ class telemetry:
             )
             return response.ok
         except:
-            print("[ERRO] telemetry timeout")
             return False
 
     def createTelemetryData(self, course_name, slug, tags, points, log):
