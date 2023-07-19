@@ -14,7 +14,7 @@ To identify the telemetry you must configure the plugin on the pytest file, addi
 
 ``` py
 import pytest
-pytestmark = pytest.mark.telemetry(COURSE_NAME, PREFIX, TAGS)
+pytestmark = pytest.mark.telemetry(IP, COURSE_NAME, PREFIX, TAGS)
 ```
 
 Where:

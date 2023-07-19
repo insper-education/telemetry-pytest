@@ -10,12 +10,9 @@ import pickle
 import signal
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
+CONFIG_SECTION = "active handout"
 QUEUE_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.obj")
-
-URL_BASE = "http://localhost:8080/"
-URL_LOGIN = URL_BASE + "api/login?next=/api/user-token"
-URL_GET_USER = URL_BASE + "api/user-info"
-URL_PUSH_DATA = URL_BASE + "api/telemetry"
+TIMEOUT = 1
 
 
 class Queue:
@@ -44,22 +41,60 @@ class Queue:
             pickle.dump(self.queue, f)
 
 
-class telemetry:
-    def __init__(self):
+class Config:
+    def __init__(self, CONFIG_FILE):
+        self.CONFIG_FILE = CONFIG_FILE
+        self.config = configparser.ConfigParser()
+        if self.config.read(self.CONFIG_FILE):
+            self.config_section = self.config[CONFIG_SECTION]
+            self.exist = True
+        else:
+            self.config_section = {}
+            self.exist = False
+
+    def updateConfig(self):
+        self.config[CONFIG_SECTION] = self.config_section
+        with open(self.CONFIG_FILE, "w") as configfile:
+            self.config.write(configfile)
+
+    def getInfo(self, info):
+        if self.exist:
+            if info in self.config_section:
+                return self.config_section[info]
+        return None
+
+    def updateInfo(self, key, value):
+        self.config_section[key] = value
+        self.updateConfig()
+
+
+class Telemetry:
+    def __init__(self, URL_BASE):
         self.queue = Queue(QUEUE_FILE)
+        self.config = Config(CONFIG_FILE)
+
         self.userToken = ""
         self.statusOk = "O"
         self.statusFail = "F"
         self.statusNone = "N"
-        self.TIMEOUT = 30
+
+        self.URL_BASE = URL_BASE
+        self.URL_LOGIN = self.URL_BASE + "/student/login"
+        self.URL_GET_USER = self.URL_BASE + "/student/info"
+        self.URL_PUSH_DATA = self.URL_BASE + "/student/push"
+
         signal.signal(signal.SIGALRM, self.interrupted)
 
     def checkToken(self, token):
         try:
-            response = requests.get(URL_GET_USER, headers={'Authorization': f'Token {token}'}, timeout=self.TIMEOUT)
-            if response.ok != 200:
+            response = requests.get(
+                self.URL_GET_USER,
+                headers={"Authorization": token},
+                timeout=TIMEOUT,
+            )
+            if response.ok == True:
                 student = json.loads(response.content)
-                if student and 'id' in student:
+                if student:
                     return True
             return None
         except:
@@ -75,36 +110,23 @@ class telemetry:
         except:
             return
 
-    def createConfig(self, token):
-        config = configparser.ConfigParser()
-        config["active handout"] = {}
-        config["active handout"]["token"] = token
-        with open(CONFIG_FILE, "w") as configfile:
-            config.write(configfile)
-
     def isFromCI(self):
         return True if os.environ.get("CI") == "CI" else False
 
-    def getStudentFromCI(self):
-        return os.environ.get("GITHUB_ACTOR")
-
     def auth(self):
-        config = configparser.ConfigParser()
-        if config.read(CONFIG_FILE):
-            if 'token' in config['active handout']:
-                token = config["active handout"]["token"]
-                status = self.checkToken(token)
-                if status == True:
-                    self.userToken = token
-                    return True
-                elif status == False:
-                    return False
+        token = self.config.getInfo("token")
+        if token is None:
+            return False
 
-        webbrowser.open(URL_LOGIN, new=1)
-        print("Wrong token, please update")
+        if self.checkToken(token):
+            self.userToken = token
+            return True
+        else:
+            return False
 
+        webbrowser.open(self.URL_LOGIN, new=1)
         while True:
-            signal.alarm(self.TIMEOUT)
+            signal.alarm(TIMEOUT)
             token = self.prompToken()
             signal.alarm(0)
             if self.checkToken(token):
@@ -121,14 +143,16 @@ class telemetry:
         data["userToken"] = self.userToken
 
     def pushDataToServer(self, data):
-        headers = {'Authorization': f'Token {self.userToken}',
-                   "Content-type": "application/json"}
+        headers = {
+            "Authorization": self.userToken,
+            "Content-type": "application/json",
+        }
         try:
             response = requests.post(
-                URL_PUSH_DATA,
+                self.URL_PUSH_DATA,
                 data=json.dumps(data),
                 headers=headers,
-                timeout=self.TIMEOUT,
+                timeout=TIMEOUT,
             )
             return response.ok
         except:
@@ -137,15 +161,8 @@ class telemetry:
     def createTelemetryData(self, course_name, slug, tags, points, log):
         if isinstance(tags, str):
             tags = [tags]
-
-        exercise = {'course': course_name,
-                    'slug': slug,
-                    'tags': tags,
-                    'points': points}
-
-        data = {'exercise': exercise,
-                'log': log}
-
+        exercise = {"course": course_name, "slug": slug, "tags": tags, "points": points}
+        data = {"exercise": exercise, "log": log}
         return data
 
     def push(self, course_name, slug, tags, points, log):
@@ -162,7 +179,6 @@ class telemetry:
                 if not self.pushDataToServer(data):
                     self.queue.put(data)
                     break
-
         self.queue.dump()
 
 
@@ -173,26 +189,54 @@ def cli(ctx, debug):
     pass
 
 
+def checkIp():
+    config = Config(CONFIG_FILE)
+    ip = config.getInfo("ip")
+    if ip is None:
+        print("Please run telemetry config ip before")
+        return False
+    else:
+        return ip
+
+
 @click.command()
 def auth():
-    t = telemetry()
+    ip = checkIp()
+    if ip is False:
+        return False
+
+    t = Telemetry(ip)
     if t.auth():
         print("All set! Configuration ok")
+    else:
+        print("Something went wrong, please try again")
 
 
 @click.command()
 def check():
-    t = telemetry()
+    ip = checkIp()
+    if ip is False:
+        return False
+
+    t = Telemetry(ip)
     t.auth()
-    data = t.createTelemetryData('test-connection', 'test-connection', 'test', 0, '')
+    data = t.createTelemetryData("test-connection", "test-connection", "test", 0, "")
     if t.pushDataToServer(data):
-        print('Connection ok, pushed data to server')
+        print("Connection ok, pushed data to server")
     else:
-        print('Connection failed')
+        print("Connection failed")
+
+
+@click.command()
+@click.argument("ip")
+def config(ip):
+    config = Config(CONFIG_FILE)
+    config.updateInfo("ip", ip)
 
 
 cli.add_command(auth)
 cli.add_command(check)
+cli.add_command(config)
 
 if __name__ == "__main__":
     cli()

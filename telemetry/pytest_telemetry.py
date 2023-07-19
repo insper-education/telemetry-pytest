@@ -1,23 +1,47 @@
 #!/usr/bin/env python3
 import pytest
-from telemetry import telemetry
+from telemetry import Telemetry
+import os.path as osp
+from pathlib import Path
+import inspect
+import time
 
-t = telemetry()
+
+def getSrcCode(item):
+    test_name = item.nodeid.split("::")[-1]
+    func_name = test_name.split("_")[1]
+    func = item.listchain()[1]
+    module = getattr(func.module, func_name)
+    return inspect.getsource(module.func)
+
 
 def push(result, config):
-    name = result["nodeid"].split("::")[1].replace('_', '-')
-    log = {"id": name, "status": result["outcome"]}
+    name = result["nodeid"].split("::")[1].replace("_", "-")
+    log = {
+        "ts": time.time(),
+        "id": config["name"],
+        "status": result["outcome"],
+        "srcCode": config["srcCode"],
+    }
 
     if log["status"] == "failed":
         log["msg"] = result["longrepr"]["reprcrash"]["message"]
 
-    t.push(config['name'], config['prefix'] + '-' + name, config['tags'], config['points'], log)
+    t = Telemetry(config["ip"])
+    t.push(
+        config["name"],
+        config["prefix"] + "-" + name,
+        config["tags"],
+        config["points"],
+        log,
+    )
 
 
 def parse_marks(item):
     marks_global = []
     marks_tags = []
     marks_points = ""
+
     for mark in item.iter_markers(name="telemetry"):
         marks_global = mark.args
         break
@@ -33,26 +57,22 @@ def parse_marks(item):
     tags = []
     tags.append(marks_global[2])
     tags.extend(marks_tags)
-    tags = [x for x in tags if x != '']
-    return {'name': marks_global[0], 'prefix': marks_global[1], 'tags': tags, 'points': marks_points}
+    tags = [x for x in tags if x != ""]
+
+    return {
+        "ip": marks_global[0],
+        "name": marks_global[1],
+        "prefix": marks_global[2],
+        "tags": tags,
+        "points": marks_points,
+        "srcCode": getSrcCode(item),
+    }
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "telemetry(name, prefix, tags): course name"
-    )
-
-    config.addinivalue_line(
-        "markers", "telemetry_tags(name): telemetry tag"
-    )
-
-    config.addinivalue_line(
-        "markers", "telemetry_points(name): telemetry points"
-    )
-
-
-def pytest_sessionstart(session):
-    session.results = []
+    config.addinivalue_line("markers", "telemetry(name, prefix, tags): course name")
+    config.addinivalue_line("markers", "telemetry_tags(name): telemetry tag")
+    config.addinivalue_line("markers", "telemetry_points(name): telemetry points")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
