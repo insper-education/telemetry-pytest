@@ -8,6 +8,8 @@ import json
 import os
 import pickle
 import signal
+import yaml
+import pytest
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
 CONFIG_SECTION = "active handout"
@@ -182,14 +184,23 @@ class Telemetry:
         self.queue.dump()
 
 
-@click.group()
-@click.option("--debug", "-b", is_flag=True, help="Enables verbose mode.")
-@click.pass_context
-def cli(ctx, debug):
-    pass
+def telemetryMark():
+    with open("telemetry.yml", "r") as file:
+        config = yaml.safe_load(file)["telemetry"]
+        if (
+            "ip" in config
+            and "course" in config
+            and "exercise-id" in config
+            and "tags" in config
+        ):
+            return pytest.mark.telemetry(
+                config["ip"], config["course"], config["exercise-id"], config["tags"]
+            )
+        print("Error: telemetry.yml file is not valid")
+        os._exit(1)
 
 
-def checkIp():
+def checkConfigIp():
     config = Config(CONFIG_FILE)
     ip = config.getInfo("ip")
     if ip is None:
@@ -199,9 +210,16 @@ def checkIp():
         return ip
 
 
+@click.group()
+@click.option("--debug", "-b", is_flag=True, help="Enables verbose mode.")
+@click.pass_context
+def cli(ctx, debug):
+    pass
+
+
 @click.command()
 def auth():
-    ip = checkIp()
+    ip = checkConfigIp()
     if ip is False:
         return False
 
@@ -214,7 +232,7 @@ def auth():
 
 @click.command()
 def check():
-    ip = checkIp()
+    ip = checkConfigIp()
     if ip is False:
         return False
 
