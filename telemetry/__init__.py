@@ -14,7 +14,7 @@ import pytest
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
 CONFIG_SECTION = "active handout"
 QUEUE_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.obj")
-TIMEOUT = 1
+TIMEOUT = 10
 
 
 class Queue:
@@ -115,29 +115,26 @@ class Telemetry:
     def isFromCI(self):
         return True if os.environ.get("CI") == "CI" else False
 
-    def auth(self):
+    def auth(self, timeout=1000):
         token = self.config.getInfo("token")
-        if token is None:
-            return False
-
-        if self.checkToken(token):
-            self.userToken = token
-            return True
-        else:
-            return False
+        if token is not None:
+            if self.checkToken(token):
+                self.userToken = token
+                return True
 
         webbrowser.open(self.URL_LOGIN, new=1)
         while True:
-            signal.alarm(TIMEOUT)
+            signal.alarm(timeout)
             token = self.prompToken()
+            if token is None:
+                return False
+
             signal.alarm(0)
             if self.checkToken(token):
+                breakpoint()
                 break
-            self.userToken = None
-            return False
 
-        self.createConfig(token)
-
+        self.config.updateInfo("token", token)
         self.userToken = token
         return True
 
@@ -160,18 +157,23 @@ class Telemetry:
         except:
             return False
 
-    def createTelemetryData(self, course_name, slug, tags, points, log):
+    def createTelemetryData(self, course, channel, tags, points, log):
         if isinstance(tags, str):
             tags = [tags]
-        exercise = {"course": course_name, "slug": slug, "tags": tags, "points": points}
-        data = {"exercise": exercise, "log": log}
-        return data
 
-    def push(self, course_name, slug, tags, points, log):
+        return {
+            "course": course,
+            "channel": channel,
+            #           "tags": tags,
+            #           "points": points,
+            "log": log,
+        }
+
+    def push(self, course, channel, tags, points, log):
         if self.userToken == "":
             self.auth()
 
-        data = self.createTelemetryData(course_name, slug, tags, points, log)
+        data = self.createTelemetryData(course, channel, tags, points, log)
         self.queue.put(data)
 
         if self.userToken != None:
@@ -185,7 +187,7 @@ class Telemetry:
 
 
 def telemetryMark():
-    with open("telemetry.yml", "r") as file:
+    with open(".telemetry.yml", "r") as file:
         config = yaml.safe_load(file)["telemetry"]
         if (
             "ip" in config
@@ -238,7 +240,7 @@ def check():
 
     t = Telemetry(ip)
     t.auth()
-    data = t.createTelemetryData("test-connection", "test-connection", "test", 0, "")
+    data = t.createTelemetryData("test-course", "test-channel", "test", 0, "TEST LOG!")
     if t.pushDataToServer(data):
         print("Connection ok, pushed data to server")
     else:
