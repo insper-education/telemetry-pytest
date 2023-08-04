@@ -76,9 +76,6 @@ class Telemetry:
         self.config = Config(CONFIG_FILE)
 
         self.userToken = ""
-        self.statusOk = "O"
-        self.statusFail = "F"
-        self.statusNone = "N"
 
         self.URL_BASE = URL_BASE
         self.URL_LOGIN = self.URL_BASE + "/student/login"
@@ -131,7 +128,6 @@ class Telemetry:
 
             signal.alarm(0)
             if self.checkToken(token):
-                breakpoint()
                 break
 
         self.config.updateInfo("token", token)
@@ -170,8 +166,8 @@ class Telemetry:
         }
 
     def push(self, course, channel, tags, points, log):
-        if self.userToken == "":
-            self.auth()
+        if self.userToken == "" and self.queue.len() == 0:
+            self.auth(10000)
 
         data = self.createTelemetryData(course, channel, tags, points, log)
         self.queue.put(data)

@@ -1,3 +1,0 @@
-myhdl
-pytest
-git+https://github.com/Insper/bits-e-proc-tools

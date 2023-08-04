@@ -15,7 +15,7 @@ def getSrcCode(item):
     return inspect.getsource(module.func)
 
 
-def push(result, config):
+def push(result, telemetry, config):
     name = result["nodeid"].split("::")[1].replace("_", "-")
     log = {
         "ts": time.time(),
@@ -27,8 +27,7 @@ def push(result, config):
     if log["status"] == "failed":
         log["msg"] = result["longrepr"]["reprcrash"]["message"]
 
-    t = Telemetry(config["ip"])
-    t.push(
+    telemetry.push(
         config["name"],
         config["prefix"] + "-" + name,
         config["tags"],
@@ -79,6 +78,8 @@ def pytest_configure(config):
 def pytest_runtest_makereport(item, call):
     outcome = yield
     result = outcome.get_result()
+    config = parse_marks(item)
 
+    telemetry = Telemetry(config["ip"])
     if result.when == "call":
-        push(result._to_json(), parse_marks(item))
+        push(result._to_json(), telemetry, config)
