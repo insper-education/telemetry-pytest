@@ -250,9 +250,21 @@ def config(ip):
     config.updateInfo("ip", ip)
 
 
+@click.group()
+def log():
+    pass
+
+
+@log.command()
+def check():
+    queue = Queue(QUEUE_FILE)
+    print(f"There is {queue.len()} logs waiting to be pushed")
+
+
 cli.add_command(auth)
 cli.add_command(check)
 cli.add_command(config)
+cli.add_command(log)
 
 if __name__ == "__main__":
     cli()
