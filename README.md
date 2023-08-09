@@ -40,4 +40,18 @@ def test_exe1():
 
 > Individual tags will be appended to the globals
 
+### Src code
+
+The plugin attempts to detect the source code being tested and then appends it to the log. This functionality currently only functions effectively with tests that rely on a single method (python). However, you have the option to explicitly indicate and include each piece of source code you wish to appear in the log:
+
+``` python
+def source(name):
+	dir = os.path.dirname(__file__)
+	src_dir = os.path.join(dir, 'src' )
+	return os.path.join(src_dir, name)
+
+@pytest.mark.telemetry_files([source('not16.vhd'), source('and16.vhd')])
+def test_not16():
+    run(vhdl_sources=[source("not16.vhd")], toplevel="not16", module="logComb_cocotb" , testcase='tb_not16', toplevel_lang="vhdl")
+```
 

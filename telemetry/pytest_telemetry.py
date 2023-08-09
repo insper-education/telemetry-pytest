@@ -7,12 +7,32 @@ import inspect
 import time
 
 
-def getSrcCode(item):
+def get_module_code(item):
     test_name = item.nodeid.split("::")[-1]
     func_name = test_name.split("_")[1]
     func = item.listchain()[1]
-    module = getattr(func.module, func_name)
-    return inspect.getsource(module.func)
+    try:
+        module = getattr(func.module, func_name)
+        return inspect.getsource(module.func)
+    except:
+        print(f"[erro] Telemetry try to get src code {func}")
+        return None
+
+
+def get_src_code(item):
+    src_code = ""
+
+    for src in item:
+        src_code = src_code + f"File name: {src} \r\n"
+        if osp.isfile(src):
+            src_file = open(src, "r")
+            src_code = src_code + src_file.read() + "\r\n"
+            src_file.close()
+        else:
+            print(f"[erro] Telemetry try to get src code {src}")
+            src_code = src_code + "None" + "\r\n"
+
+    return src_code
 
 
 def push(result, telemetry, config):
@@ -21,7 +41,7 @@ def push(result, telemetry, config):
         "ts": time.time(),
         "id": config["name"],
         "status": result["outcome"],
-        "srcCode": config["srcCode"],
+        "src": config["src"],
     }
 
     if log["status"] == "failed":
@@ -53,6 +73,16 @@ def parse_marks(item):
         marks_points = list(mark.args)
         break
 
+    srcList = []
+    for mark in item.iter_markers(name="telemetry_files"):
+        src_code_list = list(mark.args[0])
+        break
+
+    if len(src_code_list) == 0:
+        src_code_string = get_module_code(item)
+    else:
+        src_code_string = get_src_code(src_code_list)
+
     tags = []
     tags.append(marks_global[2])
     tags.extend(marks_tags)
@@ -64,7 +94,7 @@ def parse_marks(item):
         "prefix": marks_global[2],
         "tags": tags,
         "points": marks_points,
-        "srcCode": getSrcCode(item),
+        "src": src_code_string,
     }
 
 
@@ -72,6 +102,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "telemetry(name, prefix, tags): course name")
     config.addinivalue_line("markers", "telemetry_tags(name): telemetry tag")
     config.addinivalue_line("markers", "telemetry_points(name): telemetry points")
+    config.addinivalue_line("markers", "telemetry_files(name): telemetry files")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
