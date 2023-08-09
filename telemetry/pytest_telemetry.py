@@ -75,7 +75,7 @@ def parse_marks(item):
 
     src_code_list = []
     for mark in item.iter_markers(name="telemetry_files"):
-        src_code_list = list(mark.args[0])
+        src_code_list = list(mark.args)
         break
 
     if len(src_code_list) == 0:
