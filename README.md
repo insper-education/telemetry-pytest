@@ -50,7 +50,7 @@ def source(name):
 	src_dir = os.path.join(dir, 'src' )
 	return os.path.join(src_dir, name)
 
-@pytest.mark.telemetry_files([source('not16.vhd'), source('and16.vhd')])
+@pytest.mark.telemetry_files(source('not16.vhd'), source('and16.vhd'))
 def test_not16():
     run(vhdl_sources=[source("not16.vhd")], toplevel="not16", module="logComb_cocotb" , testcase='tb_not16', toplevel_lang="vhdl")
 ```
