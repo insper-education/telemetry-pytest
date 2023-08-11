@@ -110,7 +110,6 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     result = outcome.get_result()
     config = parse_marks(item)
-
     telemetry = Telemetry(config["ip"])
     if result.when == "call":
         push(result._to_json(), telemetry, config)

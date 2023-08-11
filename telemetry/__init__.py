@@ -75,7 +75,7 @@ class Telemetry:
         self.queue = Queue(QUEUE_FILE)
         self.config = Config(CONFIG_FILE)
 
-        self.userToken = ""
+        self.userToken = self.config.getInfo("token")
 
         self.URL_BASE = URL_BASE
         self.URL_LOGIN = self.URL_BASE + "/student/login"
@@ -95,8 +95,10 @@ class Telemetry:
                 student = json.loads(response.content)
                 if student:
                     return True
-            return None
+            breakpoint()
+            return False
         except:
+            breakpoint()
             return False
 
     def interrupted(signum, frame):
@@ -166,12 +168,11 @@ class Telemetry:
         }
 
     def push(self, course, channel, tags, points, log):
-        if self.userToken == "" and self.queue.len() == 0:
+        if (self.checkToken(self.userToken) is False) and (self.queue.len() == 0):
             self.auth(10000)
 
         data = self.createTelemetryData(course, channel, tags, points, log)
         self.queue.put(data)
-
         if self.userToken != None:
             for i in range(self.queue.len()):
                 data = self.queue.read()
