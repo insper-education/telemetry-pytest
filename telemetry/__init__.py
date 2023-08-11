@@ -95,10 +95,8 @@ class Telemetry:
                 student = json.loads(response.content)
                 if student:
                     return True
-            breakpoint()
             return False
         except:
-            breakpoint()
             return False
 
     def interrupted(signum, frame):
