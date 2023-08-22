@@ -15,6 +15,7 @@ CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
 CONFIG_SECTION = "active handout"
 QUEUE_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.obj")
 TIMEOUT = 10
+DEFAULT_IP = "http://3.83.45.177"
 
 
 class Queue:
@@ -71,7 +72,7 @@ class Config:
 
 
 class Telemetry:
-    def __init__(self, URL_BASE):
+    def __init__(self, URL_BASE=DEFAULT_IP):
         self.queue = Queue(QUEUE_FILE)
         self.config = Config(CONFIG_FILE)
 
@@ -216,11 +217,7 @@ def cli(ctx, debug):
 
 @click.command()
 def auth():
-    ip = checkConfigIp()
-    if ip is False:
-        return False
-
-    t = Telemetry(ip)
+    t = Telemetry()
     if t.auth():
         print("All set! Configuration ok")
     else:
@@ -229,24 +226,13 @@ def auth():
 
 @click.command()
 def check():
-    ip = checkConfigIp()
-    if ip is False:
-        return False
-
-    t = Telemetry(ip)
+    t = Telemetry()
     t.auth()
     data = t.createTelemetryData("test-course", "test-channel", "test", 0, "TEST LOG!")
     if t.pushDataToServer(data):
         print("Connection ok, pushed data to server")
     else:
         print("Connection failed")
-
-
-@click.command()
-@click.argument("ip")
-def config(ip):
-    config = Config(CONFIG_FILE)
-    config.updateInfo("ip", ip)
 
 
 @click.group()
@@ -262,7 +248,6 @@ def check():
 
 cli.add_command(auth)
 cli.add_command(check)
-cli.add_command(config)
 cli.add_command(log)
 
 if __name__ == "__main__":
