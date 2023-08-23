@@ -10,11 +10,12 @@ import pickle
 import signal
 import yaml
 import pytest
+import time
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
 CONFIG_SECTION = "active handout"
 QUEUE_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.obj")
-TIMEOUT = 10
+TIMEOUT = 100
 DEFAULT_IP = "http://3.83.45.177"
 
 
@@ -85,20 +86,30 @@ class Telemetry:
 
         signal.signal(signal.SIGALRM, self.interrupted)
 
+    def ping(self):
+        try:
+            requests.get(self.URL_BASE, timeout=TIMEOUT)
+            return True
+        except:
+            return False
+
     def checkToken(self, token):
         try:
+            if self.ping() is False:
+                return False
+
             response = requests.get(
                 self.URL_GET_USER,
                 headers={"Authorization": token},
                 timeout=TIMEOUT,
             )
-            if response.ok == True:
+            if response.ok is True:
                 student = json.loads(response.content)
                 if student:
                     return True
             return False
         except:
-            return False
+            return None
 
     def interrupted(signum, frame):
         signal.signal(signal.SIGALRM, interrupted)
@@ -115,10 +126,17 @@ class Telemetry:
 
     def auth(self, timeout=1000):
         token = self.config.getInfo("token")
+
         if token is not None:
-            if self.checkToken(token):
+            token_status = self.checkToken(token)
+            if token_status:
                 self.userToken = token
                 return True
+            elif token_status is None:
+                return False
+
+        if self.ping() is False:
+            return False
 
         webbrowser.open(self.URL_LOGIN, new=1)
         while True:
@@ -167,8 +185,7 @@ class Telemetry:
         }
 
     def push(self, course, channel, tags, points, log):
-        if (self.checkToken(self.userToken) is False) and (self.queue.len() == 0):
-            self.auth(10000)
+        self.auth(10000)
 
         data = self.createTelemetryData(course, channel, tags, points, log)
         self.queue.put(data)
