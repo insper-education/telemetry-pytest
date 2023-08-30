@@ -10,7 +10,7 @@ import pickle
 import signal
 import yaml
 import pytest
-import time
+from inputimeout import inputimeout, TimeoutOccurred
 
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".telemetry.ini")
 CONFIG_SECTION = "active handout"
@@ -29,6 +29,8 @@ class Queue:
             with open(self.file, "rb") as f:
                 return pickle.load(f)
         else:
+            with open(self.file, "wb+") as f:
+                pickle.dump(list(), f)
             return list()
 
     def put(self, item):
@@ -84,8 +86,6 @@ class Telemetry:
         self.URL_GET_USER = self.URL_BASE + "/student/info"
         self.URL_PUSH_DATA = self.URL_BASE + "/student/push"
 
-        signal.signal(signal.SIGALRM, self.interrupted)
-
     def ping(self):
         try:
             requests.get(self.URL_BASE, timeout=TIMEOUT)
@@ -111,20 +111,10 @@ class Telemetry:
         except:
             return None
 
-    def interrupted(signum, frame):
-        signal.signal(signal.SIGALRM, interrupted)
-
-    def prompToken(self):
-        try:
-            print("Past the token provide by the website after autentication")
-            return input("Token:")
-        except:
-            return
-
     def isFromCI(self):
         return True if os.environ.get("CI") == "CI" else False
 
-    def auth(self, timeout=1000):
+    def auth(self, timeout=100):
         token = self.config.getInfo("token")
 
         if token is not None:
@@ -140,12 +130,17 @@ class Telemetry:
 
         webbrowser.open(self.URL_LOGIN, new=1)
         while True:
-            signal.alarm(timeout)
-            token = self.prompToken()
+            try:
+                token = inputimeout(
+                    prompt="Past the token provide by the website after autentication >>",
+                    timeout=timeout,
+                )
+            except TimeoutOccurred:
+                return False
+
             if token is None:
                 return False
 
-            signal.alarm(0)
             if self.checkToken(token):
                 break
 
