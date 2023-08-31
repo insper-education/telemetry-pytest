@@ -14,8 +14,7 @@ For each exercise/test you must configure the telemetry to work, you can create 
 
 ``` yaml
 telemetry:
-  ip: http://127.0.0.1:3000
-  course: 23a-bits
+  course: 23b-bits
   exercise-id: lab-5
   tags: hw
 ```
